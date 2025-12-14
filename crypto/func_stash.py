@@ -198,9 +198,87 @@ def pkcs7_padding(mode, data, block_size):
     elif mode == 'unpad':
         pad_value = data[-1]
         return data[:-pad_value]
+    
+def factor_fermat(n):
+    m = int(sqrt(n))
+    for x in range(n):
+        q = (m + x) ** 2 - n
+        if q > 0:
+            if sqrt(q) * 10 % 10 == 0:
+                b = int(sqrt(q))
+                break
+            else: continue
+        else: continue
+    a = m + x
+    p = a + b
+    q = a - b
+    return p, q
+
+def factor_roh_pollard(n):
+    x_prev = 1
+    x_buff = []
+    for _ in range(n):
+        x_prev = pow(x_prev ** 2 + 1, 1, n)
+        x_buff.append(x_prev)
+        x = pow(x_prev ** 2 + 1, 1, n)
+        for x_i in x_buff:
+            d = gcd(abs(x - x_i), n)
+            if d != 1 and abs(x-x_prev) != 1:
+                p = d
+                q = n // p
+                return p, q
+            else:
+                continue
+
+def mul(args: list):
+    prod = 1
+    for i in range(len(args)):
+        prod *= args[i]
+    return prod
+    
+def factor_p_1_pollard(n):
+    b = 10
+    p_list = []
+    for i in range(b):
+        if isPrime(i): p_list.append(i)
+    for i in range(len(p_list)):
+        for j in range(len(p_list)):
+            candidate = p_list[i] ** j
+            if candidate < b and candidate not in p_list: p_list.append(candidate)
+            else: continue
+    
+    for i in range(2, 5):
+        p_list.remove(i)
+
+    m = mul(p_list)
+    a = 2
+    am = pow(a, m, n)
+    p = gcd(n, am - 1)
+    q = n // p
+    return p, q, p_list
+
+def genfold_shanks(a, b, p):
+    m = int(sqrt(p)) + 1
+    i_table = []
+    j_table = []
+    for i in range(1, m + 1):
+        i_table.append(pow(a ** (m * i), 1, p))
+    for j in range(0, m + 1):
+        j_table.append(pow(b * a ** j, 1, p))
+    rng = min(len(i_table), len(j_table))
+    for idx in range(rng):
+        if i_table[idx] in j_table:
+            i = idx + 1
+            j = j_table.index(i_table[idx])
+        else: continue
+    x = m * i - j
+    return x
+
+
 
 def main():
     pass
 
 if __name__ == '__main__':
+
     main()
