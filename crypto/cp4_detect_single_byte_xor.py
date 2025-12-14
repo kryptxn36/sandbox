@@ -1,5 +1,4 @@
 from func_stash import single_byte_xor, detect_english
-path = 'D:\code'
 
 with open(path + r'\chall\assets\cryptopals\4.txt', 'r') as f:
     data = []
@@ -16,4 +15,5 @@ def main():
     pass
 
 if __name__ == '__main__':
+
     main()
