@@ -1,3 +1,6 @@
+from func_stash import pkcs7_padding
+
+N = 10
 s_box = (
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
     0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
@@ -49,14 +52,12 @@ def m2b(state):
             b += bytes.fromhex(element)
     return b
 
-'''
 def m2h(s):
     s = [col[:] for col in s]
     for i in range(4):
         for j in range(4):
             s[i][j] = hex(s[i][j])[2:].zfill(2)
     return s
-'''
 
 def add_round_key(state, k):
     state = [col[:] for col in state]
@@ -111,7 +112,7 @@ def mix_columns(state):
 def g(k, r):
     k = [col[:] for col in k]
 
-    rcons = (0x01, 0x02, 0x04, 0x08, 0x10, 
+    rcons = (0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 
             0x20, 0x40, 0x80, 0x1b, 0x36)
 
     'rotword'
@@ -134,29 +135,55 @@ def key_expansion(k, r):
 
     for i in range(1, 4):
         k[i][0], k[i][1], k[i][2], k[i][3] =\
-        k[i][0] ^ k[i][i-1], k[i][1] ^ k[i][i-1], k[i][2] ^ k[i][2], k[1][3] ^ k[i][3]
+        k[i][0] ^ k[i-1][0], k[i][1] ^ k[i-1][1], k[i][2] ^ k[i-1][2], k[i][3] ^ k[i-1][3]
 
     return k
+
+
+def encrypt(pt, k):
+    pt = b2m(pt)
+    k = b2m(k)
+
+    pt = add_round_key(pt, k)
+    pt = sub_bytes(pt)
+    shift_rows(pt)
+    pt = mix_columns(pt)
+    k = key_expansion(k, 1)
+    pt = add_round_key(pt, k)
+
+    for r in range(2, N):
+        pt = sub_bytes(pt)
+        shift_rows(pt)
+        pt = mix_columns(pt)
+        k = key_expansion(k, r)
+        pt = add_round_key(pt, k)
+
+    pt = sub_bytes(pt)
+    shift_rows(pt)
+    k = key_expansion(k, N)
+    ct = add_round_key(pt, k)
+    return ct
+
+def decrypt(ct, k):
+    ct = b2m(ct)
+    k = b2m(k)
+    k_list = []
+    for r in range(N - 1, 0, -1):
+        k = key_expansion(k, r)
+        k_list.append(k)
+
+    print(k_list)
+    
+    #return pt
 
 def main():
     state = b'secretmessagenow'
     key = b'satishcjisboring'
+    ciphertext = encrypt(state, key)
+    print(m2h(ciphertext))
 
-    state = b2m(state)
-    key = b2m(key)
-    state = add_round_key(state, key)
-    state = sub_bytes(state)
-    shift_rows(state)
-    
-    state = mix_columns(state)
-    print(m2b(state).hex())
-    key = [
-        [0x2b, 0x7e, 0x15, 0x16],
-        [0x28, 0xae, 0xd2, 0xa6],
-        [0xab, 0xf7, 0x97, 0x66],
-        [0x76, 0x15, 0x13, 0x01]
-    ]
+    ciphertext = b'dA\xfa\xfd\xdc\xf9B{\xa2f\xe9\xaf\xed17\xce'
+    plaintext = decrypt(ciphertext, key)
 
-    print(key_expansion(key, 0))
 if __name__ == '__main__':
     main()
