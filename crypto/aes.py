@@ -95,18 +95,24 @@ def gmul(a, b):
         b = b >> 1
     return p & 0xFF
 
-def mix_columns(state):
+def mix_columns(state, mod="normal"):
     state = [col[:] for col in state]
     for i in range(4):
         a0 = state[i][0]
         a1 = state[i][1]
         a2 = state[i][2]
         a3 = state[i][3]
-
-        state[i][0] = gmul(a0, 2) ^ gmul(a1, 3) ^ gmul(a2, 1) ^ gmul(a3, 1)
-        state[i][1] = gmul(a0, 1) ^ gmul(a1, 2) ^ gmul(a2, 3) ^ gmul(a3, 1)
-        state[i][2] = gmul(a0, 1) ^ gmul(a1, 1) ^ gmul(a2, 2) ^ gmul(a3, 3)
-        state[i][3] = gmul(a0, 3) ^ gmul(a1, 1) ^ gmul(a2, 1) ^ gmul(a3, 2)
+        if mod == "normal":
+            state[i][0] = gmul(a0, 2) ^ gmul(a1, 3) ^ gmul(a2, 1) ^ gmul(a3, 1)
+            state[i][1] = gmul(a0, 1) ^ gmul(a1, 2) ^ gmul(a2, 3) ^ gmul(a3, 1)
+            state[i][2] = gmul(a0, 1) ^ gmul(a1, 1) ^ gmul(a2, 2) ^ gmul(a3, 3)
+            state[i][3] = gmul(a0, 3) ^ gmul(a1, 1) ^ gmul(a2, 1) ^ gmul(a3, 2)
+        else:
+            state[i][0] = gmul(a0, 14) ^ gmul(a1, 11) ^ gmul(a2, 13) ^ gmul(a3, 9)
+            state[i][1] = gmul(a0, 9) ^ gmul(a1, 14) ^ gmul(a2, 11) ^ gmul(a3, 13)
+            state[i][2] = gmul(a0, 13) ^ gmul(a1, 9) ^ gmul(a2, 14) ^ gmul(a3, 11)
+            state[i][3] = gmul(a0, 11) ^ gmul(a1, 13) ^ gmul(a2, 9) ^ gmul(a3, 14)
+            
     return state
 
 def g(k, r):
@@ -141,6 +147,8 @@ def key_expansion(k, r):
 
 
 def encrypt(pt, k):
+    pt = pkcs7_padding("pad", pt, 16)
+    k = pkcs7_padding("pad", k, 16)
     pt = b2m(pt)
     k = b2m(k)
 
@@ -157,7 +165,6 @@ def encrypt(pt, k):
         pt = mix_columns(pt)
         k = key_expansion(k, r)
         pt = add_round_key(pt, k)
-
     pt = sub_bytes(pt)
     shift_rows(pt)
     k = key_expansion(k, N)
@@ -166,24 +173,32 @@ def encrypt(pt, k):
 
 def decrypt(ct, k):
     ct = b2m(ct)
-    k = b2m(k)
+    k, k_init = b2m(k), b2m(k)
     k_list = []
-    for r in range(N - 1, 0, -1):
-        k = key_expansion(k, r)
+
+    for i in range(1, N + 1):
+        k = key_expansion(k, i)
         k_list.append(k)
 
-    print(k_list)
+    ct = add_round_key(ct, k_list[-1])
+
+    for r in range(2, N+1):
+        k = k_list[-r]
+        inv_shift_rows(ct)
+        ct = sub_bytes(ct, inv_s_box)
+        ct = add_round_key(ct, k)
+        ct = mix_columns(ct, "inverse")
     
-    #return pt
+    inv_shift_rows(ct)
+    ct = sub_bytes(ct, inv_s_box)
+    pt = add_round_key(ct, k_init)
+    return pt
 
 def main():
-    state = b'secretmessagenow'
+    state = b'secretmessagenoww'
     key = b'satishcjisboring'
     ciphertext = encrypt(state, key)
     print(m2h(ciphertext))
-
-    ciphertext = b'dA\xfa\xfd\xdc\xf9B{\xa2f\xe9\xaf\xed17\xce'
-    plaintext = decrypt(ciphertext, key)
-
+    
 if __name__ == '__main__':
     main()
