@@ -40,9 +40,14 @@ inv_s_box = (
 )
 
 def b2m(state):
+    state = [state[i:i+16] for i in range(0, len(state), 16)]
+    mtx = []
     if type(state) is not list:
         state = list(state)
-    return [state[i:i+4] for i in range(0, 16, 4)]
+    for block in state:
+        block = list(block)
+        mtx.append([block[i:i+4] for i in range(0, 16, 4)])
+    return mtx
 
 def m2b(state): 
     b = b''
@@ -54,10 +59,13 @@ def m2b(state):
 
 def m2h(s):
     s = [col[:] for col in s]
-    for i in range(4):
-        for j in range(4):
-            s[i][j] = hex(s[i][j])[2:].zfill(2)
-    return s
+    hex_mtx = []
+    for block in s:
+        for i in range(4):
+            for j in range(4):
+                block[i][j] = hex(block[i][j])[2:].zfill(2)
+        hex_mtx.append(block)
+    return hex_mtx
 
 def add_round_key(state, k):
     state = [col[:] for col in state]
@@ -145,12 +153,18 @@ def key_expansion(k, r):
 
     return k
 
+def tohex(s: list):
+    s = m2h(s)
+    hexstring = ""
+    for block in s:
+        for i in block:
+            for j in i:
+                hexstring += j
+    return hexstring
 
 def encrypt(pt, k):
-    pt = pkcs7_padding("pad", pt, 16)
-    k = pkcs7_padding("pad", k, 16)
-    pt = b2m(pt)
-    k = b2m(k)
+    pt = b2m(pt)[0]
+    k = b2m(k)[0]
 
     pt = add_round_key(pt, k)
     pt = sub_bytes(pt)
@@ -173,8 +187,8 @@ def encrypt(pt, k):
 
 def decrypt(ct, k):
     ct = b2m(ct)
-    k, k_init = b2m(k), b2m(k)
-    k_list = []
+    k = b2m(k)
+    k_list = [k]
 
     for i in range(1, N + 1):
         k = key_expansion(k, i)
@@ -188,17 +202,37 @@ def decrypt(ct, k):
         ct = sub_bytes(ct, inv_s_box)
         ct = add_round_key(ct, k)
         ct = mix_columns(ct, "inverse")
-    
+
     inv_shift_rows(ct)
     ct = sub_bytes(ct, inv_s_box)
-    pt = add_round_key(ct, k_init)
+    pt = add_round_key(ct, k_list[0])
     return pt
 
+def ecb(mode, data, k):
+    if mode == "encrypt":
+        pt = data
+        pt = pkcs7_padding("pad", pt, 16)
+        pt = [pt[i:i+16] for i in range(0, len(pt), 16)]
+        ct = []
+        for block in pt:
+            ct.append(encrypt(block, k))
+        return ct
+    elif mode == "decrypt":
+        ct = data
+        ct = [ct[i:i+16] for i in range(0, len(ct), 16)]
+        pt = []
+        for block in ct:
+            pt.append(decrypt(block, k))
+        return pt
+
+def cbc(mode, data, k):
+    pass
+
 def main():
-    state = b'secretmessagenoww'
+    state = b'secretmessagenow'
     key = b'satishcjisboring'
-    ciphertext = encrypt(state, key)
-    print(m2h(ciphertext))
-    
+    ciphertext = ecb("encrypt", state, key)
+    print(tohex(ciphertext))
+
 if __name__ == '__main__':
     main()
