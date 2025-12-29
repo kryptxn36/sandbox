@@ -1,7 +1,6 @@
-from math import gcd
+from math import gcd, sqrt
 import base64
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
+
 def phi(n: int):
     count = 0
     for i in range(n):
@@ -155,20 +154,6 @@ def xor_find_key(data):
     key = key.encode()
     return key
 
-def aes_ecb_enc(pt, k):
-    cipher = AES.new(k, AES.MODE_ECB)
-    pt = pad(pt, 16)
-    k = pad(k, 16)
-    ct = cipher.encrypt(pt)
-    return ct
-
-def aes_ecb_dec(ct, k):
-    k = pad(k, 16)
-    cipher = AES.new(k, AES.MODE_ECB)
-    pt = cipher.decrypt(ct)
-    #pt = unpad(pt, 16)
-    return pt
-
 def detect_ecb(candidates):
     for c in candidates:
         buff = []
@@ -181,7 +166,8 @@ def detect_ecb(candidates):
                 else:
                     continue
 
-def pkcs7_padding(mode, data, block_size):
+
+def pkcs7_padding(mode: str, data: bytes | str, block_size: int) -> bytes:
     if type(data) != bytes:
         data = data.encode()
     else:
@@ -190,7 +176,7 @@ def pkcs7_padding(mode, data, block_size):
     data_length = len(data)
     if mode == 'pad':
         if data_length % block_size == 0:
-            return data
+            return data + bytes.fromhex(hex(block_size)[2:].zfill(2)) * block_size
         else:
             pad_value = block_size - data_length % block_size
             padded = data + l[pad_value] * pad_value

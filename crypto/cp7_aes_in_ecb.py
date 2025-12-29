@@ -1,13 +1,12 @@
 from base64 import b64decode
-from func_stash import aes_ecb_dec
+from aes import ecb
+import os
 
-with open(r'.\assets\cryptopals\7.txt', 'r') as f:
-    data = ''
-    for line in f.readlines():
-        data += line.strip()
-    data = b64decode(data)
-print(data)
+with open(f'{os.path.join("assets", "cryptopals", "7.txt")}', 'r') as f:
+    ciphertext = f.read()
+
+ciphertext = b64decode(ciphertext)
 key = b"YELLOW SUBMARINE"
-
-plaintext = aes_ecb_dec(data, key)
+plaintext = ecb("decrypt", ciphertext, key)
+plaintext = bytes.fromhex(plaintext)
 print(plaintext)
