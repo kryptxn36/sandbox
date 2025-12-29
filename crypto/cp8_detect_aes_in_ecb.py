@@ -1,5 +1,6 @@
 from func_stash import detect_ecb
-with open(r'.\assets\cryptopals\8.txt', 'r') as f:
+import os
+with open(f'{os.path.join("assets", "cryptopals", "8.txt")}', 'r') as f:
     data = []
     for line in f.readlines():
         data.append(line.strip())
