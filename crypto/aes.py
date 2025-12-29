@@ -39,25 +39,28 @@ inv_s_box = (
     0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D,
 )
 
-def b2m(state):
+def b2m(state) -> list:
     state = [state[i:i+16] for i in range(0, len(state), 16)]
     mtx = []
-    if type(state) is not list:
-        state = list(state)
+    state = list(state)
     for block in state:
         block = list(block)
         mtx.append([block[i:i+4] for i in range(0, 16, 4)])
-    return mtx
+    if len(mtx) > 1:
+        return mtx
+    elif len(mtx) == 1:
+        return mtx[0]
 
-def m2b(state): 
+def m2b(state: list) -> bytes:
     b = b''
-    for i in range(4):
-        for j in range(4):
-            element = hex(state[i][j])[2:].zfill(2)
-            b += bytes.fromhex(element)
+    for block in state:
+        for i in range(4):
+            for j in range(4):
+                element = hex(block[i][j])[2:].zfill(2)
+                b += bytes.fromhex(element)
     return b
 
-def m2h(s):
+def m2h(s: list) -> list:
     s = [col[:] for col in s]
     hex_mtx = []
     for block in s:
@@ -67,21 +70,22 @@ def m2h(s):
         hex_mtx.append(block)
     return hex_mtx
 
-def add_round_key(state, k):
+def add_round_key(state: list, k: list) -> list:
     state = [col[:] for col in state]
+
     for i in range(4):
         for j in range(4):
             state[i][j] ^= k[i][j]
     return state
 
-def sub_bytes(state, sbox=s_box):
+def sub_bytes(state: list, sbox=s_box) -> list:
     state = [col[:] for col in state]
     for i in range(4):
         for j in range(4):
             state[i][j] = sbox[state[i][j]]
     return state
 
-def shift_rows(state):
+def shift_rows(state: list):
     state[0][1], state[1][1], state[2][1], state[3][1] = state[1][1], state[2][1], state[3][1], state[0][1]
     state[0][2], state[1][2], state[2][2], state[3][2] = state[2][2], state[3][2], state[0][2], state[1][2]
     state[0][3], state[1][3], state[2][3], state[3][3] = state[3][3], state[0][3], state[1][3], state[2][3]
@@ -90,7 +94,7 @@ def inv_shift_rows(state):
     for _ in range(3):
         shift_rows(state)
 
-def gmul(a, b):
+def gmul(a: int, b: int) -> int:
     p = 0
     hi_bit_set = 0
     for _ in range(8):
@@ -103,14 +107,14 @@ def gmul(a, b):
         b = b >> 1
     return p & 0xFF
 
-def mix_columns(state, mod="normal"):
+def mix_columns(state: list, mode:str ="normal") -> list:
     state = [col[:] for col in state]
     for i in range(4):
         a0 = state[i][0]
         a1 = state[i][1]
         a2 = state[i][2]
         a3 = state[i][3]
-        if mod == "normal":
+        if mode == "normal":
             state[i][0] = gmul(a0, 2) ^ gmul(a1, 3) ^ gmul(a2, 1) ^ gmul(a3, 1)
             state[i][1] = gmul(a0, 1) ^ gmul(a1, 2) ^ gmul(a2, 3) ^ gmul(a3, 1)
             state[i][2] = gmul(a0, 1) ^ gmul(a1, 1) ^ gmul(a2, 2) ^ gmul(a3, 3)
@@ -123,7 +127,7 @@ def mix_columns(state, mod="normal"):
             
     return state
 
-def g(k, r):
+def g(k: list, r: int) -> list:
     k = [col[:] for col in k]
 
     rcons = (0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 
@@ -140,7 +144,7 @@ def g(k, r):
     k[3][0] ^= rcons[r]
     return k
 
-def key_expansion(k, r):
+def key_expansion(k: list, r: int) -> list:
     k = [col[:] for col in k]
     w3 = g(k, r)[3]
 
@@ -153,7 +157,8 @@ def key_expansion(k, r):
 
     return k
 
-def tohex(s: list):
+def tohex(s: list) -> str:
+    s = [col[:] for col in s]
     s = m2h(s)
     hexstring = ""
     for block in s:
@@ -162,8 +167,18 @@ def tohex(s: list):
                 hexstring += j
     return hexstring
 
-def encrypt(pt, k):
-    pt = b2m(pt)[0]
+def tobytes(s: list) -> bytes:
+    s = [col[:] for col in s]
+    s = m2h(s)
+    bytestring = b""
+    for block in s:
+        for i in block:
+            for j in i:
+                bytestring += bytes.fromhex(j)
+    return bytestring
+
+def encrypt(pt, k) -> list:
+    pt = b2m(pt)
     k = b2m(k)[0]
 
     pt = add_round_key(pt, k)
@@ -185,9 +200,9 @@ def encrypt(pt, k):
     ct = add_round_key(pt, k)
     return ct
 
-def decrypt(ct, k):
+def decrypt(ct, k) -> list:
     ct = b2m(ct)
-    k = b2m(k)
+    k = b2m(k)[0]
     k_list = [k]
 
     for i in range(1, N + 1):
@@ -208,31 +223,70 @@ def decrypt(ct, k):
     pt = add_round_key(ct, k_list[0])
     return pt
 
-def ecb(mode, data, k):
+def ecb(mode: str, data: bytes, k: bytes) -> str:
     if mode == "encrypt":
         pt = data
         pt = pkcs7_padding("pad", pt, 16)
+        k = pkcs7_padding("pad", k, 16)
         pt = [pt[i:i+16] for i in range(0, len(pt), 16)]
         ct = []
         for block in pt:
             ct.append(encrypt(block, k))
+        ct = tohex(ct)
         return ct
     elif mode == "decrypt":
         ct = data
         ct = [ct[i:i+16] for i in range(0, len(ct), 16)]
+        k = pkcs7_padding("pad", k, 16)
         pt = []
         for block in ct:
             pt.append(decrypt(block, k))
+        pt = tohex(pt)
+        pt = bytes.fromhex(pt) 
+        pt = pkcs7_padding("unpad", pt, 16)
+        pt = pt.hex()
         return pt
 
-def cbc(mode, data, k):
-    pass
+def cbc(mode: str, data: bytes, iv: bytes, k: bytes) -> str:
+    if mode == "encrypt":
+        pt = data
+        iv = b2m(iv)
+        pt = pkcs7_padding("pad", pt, 16)
+        k = pkcs7_padding("pad", k, 16)
+        pt = [pt[i:i+16] for i in range(0, len(pt), 16)]
+        ct = []
+        pt_init = b2m(pt[0])
+        pt_init = add_round_key(pt_init, iv)
+        pt_init = bytes.fromhex(tohex([pt_init]))
+        ct_init = encrypt(pt_init, k)
+        ct.append(ct_init)
+        for i in range(1, len(pt)):
+            ct_block = add_round_key(b2m(pt[i]), ct[i - 1])
+            ct_block = tobytes([ct_block])
+            ct_block = encrypt(ct_block, k)
+            ct.append(ct_block)
+        ct = tohex(ct)
+        return ct
+
+    elif mode == "decrypt":
+        ct = data
+        iv = b2m(iv)
+        k = pkcs7_padding("pad", k, 16)
+        ct = [ct[i:i+16] for i in range(0, len(ct), 16)]
+        pt = []
+
+        for i in range(len(ct)):
+            pt_block = decrypt(ct[i], k)
+            pt_block = add_round_key(pt_block, iv)
+            iv = b2m(ct[i])
+            pt.append(pt_block)
+        pt = tohex(pt)
+        pt = bytes.fromhex(pt)
+        pt = pkcs7_padding("unpad", pt, 16)
+        return pt
 
 def main():
-    state = b'secretmessagenow'
-    key = b'satishcjisboring'
-    ciphertext = ecb("encrypt", state, key)
-    print(tohex(ciphertext))
+    pass
 
 if __name__ == '__main__':
     main()
