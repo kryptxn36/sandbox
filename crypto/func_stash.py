@@ -165,6 +165,7 @@ def detect_ecb(candidates: list):
                     return c
                 else:
                     continue
+
 def pkcs7_padding_scheme(mode: str, data: bytes | str, block_size: int):
     if type(data) is str:
         data = data.encode()
@@ -199,6 +200,7 @@ def factor_fermat(n: int) -> tuple | None:
             else: continue
         else: continue
     return None
+
 def factor_roh_pollard(n):
     x_prev = 1
     x_buff = []
@@ -242,16 +244,11 @@ def factor_p_1_pollard(n):
     q = n // p
     return p, q, p_list
 
-def genfold_shanks(a, b, p):
+def genfold_shanks(a: int, b: int, p: int) -> int | None:
     m = int(sqrt(p)) + 1
-    i_table = []
-    j_table = []
-    for i in range(1, m + 1):
-        i_table.append(pow(a ** (m * i), 1, p))
-    for j in range(0, m + 1):
-        j_table.append(pow(b * a ** j, 1, p))
-    rng = min(len(i_table), len(j_table))
-    for idx in range(rng):
+    i_table = [pow(a ** (m * i), 1, p) for i in range(1, m + 1)]
+    j_table = [pow(b * a ** j, 1, p) for j in range(0, m + 1)]
+    for idx in range(len(i_table)):
         if i_table[idx] in j_table:
             i = idx + 1
             j = j_table.index(i_table[idx])
@@ -268,10 +265,10 @@ def keygen(size) -> bytes:
 
 def encryption_oracle(plaintext: bytes) -> str:
     key = keygen(16)
-    case = randint(0, 1)
     apdx_size = randint(5, 10)
     apdx_value = randint(0, 255).to_bytes(1, "big")
     plaintext = apdx_value * apdx_size + plaintext + apdx_value * apdx_size
+    case = randint(0, 1)
     if case == 0:
         ciphertext = ecb("encrypt", plaintext, key)
     else:
