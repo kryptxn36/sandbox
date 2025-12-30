@@ -81,7 +81,6 @@ def single_byte_xor(ct):
             pt = pt_candidate
             max_score = last_score
             k = i
-
     return pt, k
 
 def detect_english(candidate_list):
@@ -91,7 +90,8 @@ def detect_english(candidate_list):
         if fq_min is None or fq < fq_min:
             fq_min = fq
             pt = c
-    return pt
+            return pt
+    return None
 
 def d_hamming(a: bytes, b: bytes):
     if type(a) is str:
@@ -121,23 +121,21 @@ def d_hamming(a: bytes, b: bytes):
             continue
     return d
 
-def xor_calc_keysize(ct, bottom, top):
+def xor_calc_keysize(ct: bytes, bottom: int, top: int) -> int | None:
     d_histogram = {}
     for k in range(bottom, top + 1):
         block1 = ct[:4*k]
         block2 = ct[4*k:8*k]
         d = d_hamming(block1, block2) / k
         d_histogram.update({k: round(d, 4)})
-
     d_min = min(d_histogram.values())
-
     for x in d_histogram.items():
         if d_min == x[1]:
             keysize = x[0]
-            break
+            return keysize
         else:
             continue
-    return keysize
+    return None
 
 def transpose(data, size):
     data_transp = []
@@ -156,7 +154,7 @@ def xor_find_key(data):
     key = key.encode()
     return key
 
-def detect_ecb(candidates):
+def detect_ecb(candidates: list):
     for c in candidates:
         buff = []
         for i in range(0, len(c), 32):
@@ -167,7 +165,6 @@ def detect_ecb(candidates):
                     return c
                 else:
                     continue
-
 def pkcs7_padding_scheme(mode: str, data: bytes | str, block_size: int):
     if type(data) is str:
         data = data.encode()
@@ -223,7 +220,7 @@ def mul(args: list):
     for i in range(len(args)):
         prod *= args[i]
     return prod
-    
+
 def factor_p_1_pollard(n):
     b = 10
     p_list = []
@@ -273,18 +270,23 @@ def encryption_oracle(plaintext: bytes) -> str:
     key = keygen(16)
     case = randint(0, 1)
     apdx_size = randint(5, 10)
-    apdx_value = randint(0, 256).to_bytes(1, "big")
+    apdx_value = randint(0, 255).to_bytes(1, "big")
     plaintext = apdx_value * apdx_size + plaintext + apdx_value * apdx_size
     if case == 0:
         ciphertext = ecb("encrypt", plaintext, key)
     else:
-        iv = b"\x00" * 16
+        iv = keygen(16)
         ciphertext = cbc("encrypt", plaintext, iv, key)
     return ciphertext
+
+def detect_ecb_cbc(candidate) -> str:
+    if detect_ecb([candidate]):
+        return "ECB"
+    else:
+        return "CBC" 
 
 def main():
     pass
 
 if __name__ == '__main__':
-
     main()
