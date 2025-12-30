@@ -1,5 +1,3 @@
-from func_stash import pkcs7_padding
-
 N = 10
 s_box = (
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -39,17 +37,19 @@ inv_s_box = (
     0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D,
 )
 
-def b2m(state) -> list:
-    state = [state[i:i+16] for i in range(0, len(state), 16)]
-    mtx = []
-    state = list(state)
-    for block in state:
-        block = list(block)
-        mtx.append([block[i:i+4] for i in range(0, 16, 4)])
-    if len(mtx) > 1:
-        return mtx
-    elif len(mtx) == 1:
-        return mtx[0]
+def b2m(state: bytes) -> list | None:
+    if type(state) is bytes:
+        state = [state[i:i+16] for i in range(0, len(state), 16)]
+        mtx = []
+        state = list(state)
+        for block in state:
+            block = list(block)
+            mtx.append([block[i:i+4] for i in range(0, 16, 4)])
+        if len(mtx) > 1:
+            return mtx
+        elif len(mtx) == 1:
+            return mtx[0]
+    else: raise(TypeError(f"{type(state)} is not valid."))
 
 def m2b(state: list) -> bytes:
     b = b''
@@ -177,6 +177,26 @@ def tobytes(s: list) -> bytes:
                 bytestring += bytes.fromhex(j)
     return bytestring
 
+def pkcs7_padding(mode: str, data: bytes | str, block_size: int):
+    if type(data) is str:
+        data = data.encode()
+    elif type(data) is bytes:
+        pass
+    else:
+        raise(TypeError(f"{type(data)} is not valid."))
+    l = [bytes([x]) for x in range(block_size)]
+    data_length = len(data)
+    if mode == 'pad':
+        if data_length % block_size == 0:
+            return data + bytes.fromhex(hex(block_size)[2:].zfill(2)) * block_size
+        else:
+            pad_value = block_size - data_length % block_size
+            padded = data + l[pad_value] * pad_value
+            return padded
+    elif mode == 'unpad':
+        pad_value = data[-1]
+        return data[:-pad_value]
+
 def encrypt(pt, k) -> list:
     pt = b2m(pt)
     k = b2m(k)[0]
@@ -223,7 +243,7 @@ def decrypt(ct, k) -> list:
     pt = add_round_key(ct, k_list[0])
     return pt
 
-def ecb(mode: str, data: bytes, k: bytes) -> str:
+def ecb(mode: str, data: bytes, k: bytes) -> str | bytes: 
     if mode == "encrypt":
         pt = data
         pt = pkcs7_padding("pad", pt, 16)
@@ -244,7 +264,6 @@ def ecb(mode: str, data: bytes, k: bytes) -> str:
         pt = tohex(pt)
         pt = bytes.fromhex(pt) 
         pt = pkcs7_padding("unpad", pt, 16)
-        pt = pt.hex()
         return pt
 
 def cbc(mode: str, data: bytes, iv: bytes, k: bytes) -> str:
