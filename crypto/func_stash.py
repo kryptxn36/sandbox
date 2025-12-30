@@ -1,4 +1,6 @@
 from math import gcd, sqrt
+from random import randint
+from aes import ecb, cbc
 import base64
 
 def phi(n: int):
@@ -166,12 +168,13 @@ def detect_ecb(candidates):
                 else:
                     continue
 
-
-def pkcs7_padding(mode: str, data: bytes | str, block_size: int) -> bytes:
-    if type(data) != bytes:
+def pkcs7_padding_scheme(mode: str, data: bytes | str, block_size: int):
+    if type(data) is str:
         data = data.encode()
-    else:
+    elif type(data) is bytes:
         pass
+    else:
+        raise(TypeError(f"{type(data)} is not valid."))
     l = [bytes([x]) for x in range(block_size)]
     data_length = len(data)
     if mode == 'pad':
@@ -185,21 +188,20 @@ def pkcs7_padding(mode: str, data: bytes | str, block_size: int) -> bytes:
         pad_value = data[-1]
         return data[:-pad_value]
     
-def factor_fermat(n):
+def factor_fermat(n: int) -> tuple | None:
     m = int(sqrt(n))
     for x in range(n):
         q = (m + x) ** 2 - n
         if q > 0:
             if sqrt(q) * 10 % 10 == 0:
                 b = int(sqrt(q))
-                break
+                a = m + x
+                p = a + b
+                q = a - b
+                return p, q
             else: continue
         else: continue
-    a = m + x
-    p = a + b
-    q = a - b
-    return p, q
-
+    return None
 def factor_roh_pollard(n):
     x_prev = 1
     x_buff = []
@@ -256,11 +258,29 @@ def genfold_shanks(a, b, p):
         if i_table[idx] in j_table:
             i = idx + 1
             j = j_table.index(i_table[idx])
+            x = m * i - j
+            return x
         else: continue
-    x = m * i - j
-    return x
+    return None
 
+def keygen(size) -> bytes:
+    key = b""
+    for _ in range(size):
+        key += randint(0, 255).to_bytes(1, 'big')
+    return key
 
+def encryption_oracle(plaintext: bytes) -> str:
+    key = keygen(16)
+    case = randint(0, 1)
+    apdx_size = randint(5, 10)
+    apdx_value = randint(0, 256).to_bytes(1, "big")
+    plaintext = apdx_value * apdx_size + plaintext + apdx_value * apdx_size
+    if case == 0:
+        ciphertext = ecb("encrypt", plaintext, key)
+    else:
+        iv = b"\x00" * 16
+        ciphertext = cbc("encrypt", plaintext, iv, key)
+    return ciphertext
 
 def main():
     pass
