@@ -140,34 +140,37 @@ def siegenthaler_autonomous() -> None:
         print(f'File "{enc_file}" not found!')
     else:
         filename = re.search(r"(\d{1,}_\d{1,})", enc_file).group(1)
-        filetype = re.search(r"(?<=\.)([a-z]{1,})(?=\.)", enc_file).group(0)
-        if filetype not in headers:
-            print(f'"{filetype}" is not supported')
+        try:
+            filetype = re.search(r"(?<=\.)([a-z]{1,})(?=\.)", enc_file).group(1)
+        except:
+            print(f"Can not decrypt provided file.")
         else:
-            dec_file = f"{filename}.{filetype}"
-
-            enc_header = extract_header(enc_file)
-            gamma_part = xor(enc_header, headers[f"{filetype}"])
-            key_1 = max_correlation(gamma_part, register_1)
-            key_3 = max_correlation(gamma_part, register_3)
-            key_2 = geffe_analysis(registers, gamma_part, key_1, key_3)
-            gamma = geffe(registers, key_1=key_1, key_2=key_2, key_3=key_3, gamma_length=3255)
-
-            with open(f"{enc_file}", 'rb') as f:
-                data = f.read()
-            if len(gamma) % 2: 
-                gamma += '0'
-            gamma = int(gamma, 2)
-            gamma = hex(gamma)[2:]
-            decrypted = xor(data, bytes.fromhex(gamma), "bytes")
-            with open(f"{dec_file}", 'wb') as d:
-                d.write(decrypted)
-            return None
+            if filetype not in headers:
+                print(f'"{filetype}" is not supported')
+            else:
+                dec_file = f"{filename}.{filetype}"
+                enc_header = extract_header(enc_file)
+                gamma_part = xor(enc_header, headers[f"{filetype}"])
+                key_1 = max_correlation(gamma_part, registers[0])
+                key_3 = max_correlation(gamma_part, registers[2])
+                key_2 = geffe_analysis([register_1, register_2, register_3], gamma_part, key_1, key_3)
+                gamma = geffe(registers, key_1=key_1, key_2=key_2, key_3=key_3, gamma_length=3255)
+                with open(f"{enc_file}", 'rb') as f:
+                    data = f.read()
+                if len(gamma) % 2: 
+                    gamma += '0'
+                gamma = int(gamma, 2)
+                gamma = hex(gamma)[2:]
+                decrypted = xor(data, bytes.fromhex(gamma), "bytes")
+                with open(f"{dec_file}", 'wb') as d:
+                    d.write(decrypted)
+                return None
 
 def siegenthaler_dependent() -> str | None:
     register_1 = [4, 2, 0]
     register_2 = [3, 1, 0]
     register_3 = [5, 2, 0]
+    registers = [register_1, register_2, register_3]
 
     headers = {
         "pdf": "255044462d312e35",
@@ -175,49 +178,49 @@ def siegenthaler_dependent() -> str | None:
         "docx": "504b030414000600",
         "xlsx": "504b030414000600",
         "pptx": "504b030414000600"
-        } # these MS Office files happen to share the same signature
+        }
     enc_file = args.encrypted_file
     if not os.path.exists(enc_file):
         print(f'File "{enc_file}" not found!')
     else:
         filename = re.search(r"^.*?(?=-|\.)", enc_file).group(0)
-        filetype = re.search(r"(?<=\.)([a-z]{1,})(?=\.)", enc_file).group(0)
-        if filetype not in headers:
-            print(f'"{filetype}" is not supported')
+        try:
+            filetype = re.search(r"(?<=\.)([a-z]{1,})(?=\.)", enc_file).group(1)
+        except:
+            print(f"Can not decrypt provided file.")
         else:
-            dec_file = f"{filename}.{filetype}"
-            enc_header = extract_header(enc_file)
-            gamma_part = xor(enc_header, headers[f"{filetype}"])
-            keys = gen_keys(gamma_part, [register_1, register_3])
-            for key in keys:
-                with open("key.txt", "w") as k:
-                    k.write(key)
-                    k.close()
-                    pass
-                subprocess.run(f'./geffe registers.txt key.txt g.txt > /dev/null', shell='/bin/bash')
-                with open("g.txt", 'r') as g:
-                    gamma = g.read()
-
-                with open(f"{enc_file}", 'rb') as e:
-                    data = e.read()
-                    
-                if len(gamma) % 2: 
-                    gamma += '0'
-                gamma = int(gamma, 2)
-                gamma = hex(gamma)[2:]
-
-                decrypted = xor(data, bytes.fromhex(gamma), "bytes")
-                if decrypted.hex()[:16] == headers[f"{filetype}"]:
-                    with open(f"{dec_file}", "wb") as d:
-                        d.write(decrypted)
-                    success_msg =\
-f"{enc_file} has been successfully decrypted as {dec_file}.\n\
-Key: {key}.\n\
-Gamma is saved to g.txt"
-                    return print(success_msg)
-                else:
-                    continue
-            print("Decryption failed")
+            if filetype not in headers:
+                print(f'"{filetype}" is not supported.')
+            else:
+                dec_file = f"{filename}.{filetype}"
+                enc_header = extract_header(enc_file)
+                gamma_part = xor(enc_header, headers[f"{filetype}"])
+                keys = gen_keys(gamma_part, [register_1, register_3])
+                for key in keys:
+                    with open("key.txt", "w") as k:
+                        k.write(key)
+                        k.close()
+                        pass
+                    subprocess.run(f'./{os.path.join("geffe")} registers.txt key.txt g.txt > /dev/null', shell='/bin/bash')
+                    with open("g.txt", 'r') as g:
+                        gamma = g.read()
+                    with open(f"{enc_file}", 'rb') as e:
+                        data = e.read()
+                    if len(gamma) % 2: 
+                        gamma += '0'
+                    gamma = int(gamma, 2)
+                    gamma = hex(gamma)[2:]
+                    decrypted = xor(data, bytes.fromhex(gamma), "bytes")
+                    if decrypted.hex()[:16] == headers[f"{filetype}"]:
+                        with open(f"{dec_file}", "wb") as d:
+                            d.write(decrypted)
+                        print(f"{enc_file} has been successfully decrypted as {dec_file}")
+                        print(f"Key: {key}")
+                        print(f"Gamma is saved to g.txt")
+                        return None
+                    else:
+                        continue
+                print("Decryption failed")
 
 def main():
     siegenthaler_dependent()
