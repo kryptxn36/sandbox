@@ -83,7 +83,7 @@ def gen_keys(gamma: str, registers: list) -> list:
     keys = [state_1 + key + state_2 for key in keys]
     return keys
 
-def geffe(registers: list, key_1: str, key_3: str, key_2='001', gamma_length=64) -> str:
+def geffe(registers: list, key_1: str, key_2: str, key_3: str, gamma_length=64) -> str:
     registers = sorted(registers)
     registers.insert(1, registers.pop(0)) # put registers in the right order
 
@@ -109,7 +109,7 @@ def geffe_analysis(registers: list, gamma: str, key_1: str, key_3: str) -> str:
     x = gen_init_states(3)
     candidates = []
     for state in x: # f(x1, x2, x3) = (x1 & x2) ^ (!x2 & x3)
-        f = geffe(registers, key_1=key_1, key_2=state, key_3=key_3)
+        f = geffe(registers, key_1, state, key_3)
         candidates.append(f)
     correl_list = []
     for c in candidates:
@@ -118,10 +118,61 @@ def geffe_analysis(registers: list, gamma: str, key_1: str, key_3: str) -> str:
     return key_2
 
 def siegenthaler_autonomous() -> None:
+    register_1 = [4, 2, 0]
+    register_2 = [3, 1, 0]
+    register_3 = [5, 2, 0]
+
+    headers = {
+        "pdf": "255044462d312e35",
+        "vsdx": "504b030414000600",
+        "docx": "504b030414000600",
+        "xlsx": "504b030414000600",
+        "pptx": "504b030414000600"
+        } # these MS Office files happen to share the same signature
+    enc_file = args.encrypted_file
+    if not os.path.exists(enc_file):
+        print(f'File "{enc_file}" not found!')
+    else:
+        filename = re.search(r"^.*?(?=-|\.)", enc_file).group(0)
+        try:
+            filetype = re.search(r"(?<=\.)([a-z]{1,})(?=\.)", enc_file).group(1)
+        except:
+            print(f"Can not decrypt provided file.")
+        else:
+            if filetype not in headers:
+                print(f'"{filetype}" is not supported')
+            else:
+                dec_file = f"{filename}.{filetype}"
+                enc_header = extract_header(enc_file)
+                gamma_part = xor(enc_header, headers[f"{filetype}"])
+                key_1 = max_correlation(gamma_part, register_1)
+                key_3 = max_correlation(gamma_part, register_3)
+                key_2 = geffe_analysis([register_1, register_2, register_3], gamma_part, key_1, key_3)
+                key = key_1 + key_2 + key_3
+                gamma = geffe([register_1, register_2, register_3], key_1=key_1, key_2=key_2, key_3=key_3, gamma_length=3255)
+                with open(f"{enc_file}", 'rb') as f:
+                    data = f.read()
+                if len(gamma) % 2: 
+                    gamma += '0'
+                gamma = int(gamma, 2)
+                gamma = hex(gamma)[2:]
+                decrypted = xor(data, bytes.fromhex(gamma), "bytes")
+                if decrypted.hex()[:16] == headers[f"{filetype}"]:
+                    with open ("gamma.txt", "w") as g:
+                        g.write(gamma)
+                    with open(f"{dec_file}", "wb") as d:
+                        d.write(decrypted)
+                    print(f"{enc_file} has been successfully decrypted as {dec_file}.")
+                    print(f"Key: {key}.")
+                    print(f"Gamma is saved to g.txt")
+                    return None
+                print("Decryption failed")
+
+def siegenthaler_dependent() -> str | None:
     '''
-    this could work but the parameters in given geffe binary are unknown
-    so for now it's impossible to omit its usage
-    geffe binary will be integrated in this script in order for it to work
+    the autonomous function is working now
+    no more need for geffe binary
+    this function will reside in the code base in case of the task being modified
     '''
     register_1 = [4, 2, 0]
     register_2 = [3, 1, 0]
@@ -136,37 +187,6 @@ def siegenthaler_autonomous() -> None:
         "pptx": "504b030414000600"
         } # these MS Office files happen to share the same signature
     enc_file = args.encrypted_file
-    if not os.path.exists(enc_file):
-        print(f'File "{enc_file}" not found!')
-    else:
-        filename = re.search(r"(\d{1,}_\d{1,})", enc_file).group(1)
-        try:
-            filetype = re.search(r"(?<=\.)([a-z]{1,})(?=\.)", enc_file).group(1)
-        except:
-            print(f"Can not decrypt provided file.")
-        else:
-            if filetype not in headers:
-                print(f'"{filetype}" is not supported')
-            else:
-                dec_file = f"{filename}.{filetype}"
-                enc_header = extract_header(enc_file)
-                gamma_part = xor(enc_header, headers[f"{filetype}"])
-                key_1 = max_correlation(gamma_part, registers[0])
-                key_3 = max_correlation(gamma_part, registers[2])
-                key_2 = geffe_analysis([register_1, register_2, register_3], gamma_part, key_1, key_3)
-                gamma = geffe(registers, key_1=key_1, key_2=key_2, key_3=key_3, gamma_length=3255)
-                with open(f"{enc_file}", 'rb') as f:
-                    data = f.read()
-                if len(gamma) % 2: 
-                    gamma += '0'
-                gamma = int(gamma, 2)
-                gamma = hex(gamma)[2:]
-                decrypted = xor(data, bytes.fromhex(gamma), "bytes")
-                with open(f"{dec_file}", 'wb') as d:
-                    d.write(decrypted)
-                return None
-
-def siegenthaler_dependent() -> str | None:
     if not os.path.exists("geffe"):
         print('Required binary file "geffe" not found.')
         print('Put it as well as the "registers.txt" file in the working directory')
@@ -175,7 +195,6 @@ def siegenthaler_dependent() -> str | None:
         register_1 = [4, 2, 0]
         register_2 = [3, 1, 0]
         register_3 = [5, 2, 0]
-        registers = [register_1, register_2, register_3]
 
         headers = {
             "pdf": "255044462d312e35",
@@ -228,7 +247,7 @@ def siegenthaler_dependent() -> str | None:
                     print("Decryption failed")
 
 def main():
-    siegenthaler_dependent()
+    siegenthaler_autonomous()
 
 if __name__ == "__main__":
     main()
