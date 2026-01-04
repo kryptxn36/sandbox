@@ -158,7 +158,7 @@ def siegenthaler_autonomous() -> None:
                 gamma = hex(gamma)[2:]
                 decrypted = xor(data, bytes.fromhex(gamma), "bytes")
                 if decrypted.hex()[:16] == headers[f"{filetype}"]:
-                    with open ("gamma.txt", "w") as g:
+                    with open ("g.txt", "w") as g:
                         g.write(gamma)
                     with open(f"{dec_file}", "wb") as d:
                         d.write(decrypted)
@@ -174,19 +174,6 @@ def siegenthaler_dependent() -> str | None:
     no more need for geffe binary
     this function will reside in the code base in case of the task being modified
     '''
-    register_1 = [4, 2, 0]
-    register_2 = [3, 1, 0]
-    register_3 = [5, 2, 0]
-    registers = [register_1, register_2, register_3]
-
-    headers = {
-        "pdf": "255044462d312e35",
-        "vsdx": "504b030414000600",
-        "docx": "504b030414000600",
-        "xlsx": "504b030414000600",
-        "pptx": "504b030414000600"
-        } # these MS Office files happen to share the same signature
-    enc_file = args.encrypted_file
     if not os.path.exists("geffe"):
         print('Required binary file "geffe" not found.')
         print('Put it as well as the "registers.txt" file in the working directory')
