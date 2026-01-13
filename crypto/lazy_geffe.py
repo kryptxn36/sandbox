@@ -11,13 +11,23 @@ parser = argparse.ArgumentParser(
     But if you are using this program you already know what it does anyway.\
     Supported formats:\n\
     .pdf\n\
+    .png\n\
     .vsdx\n\
     .docx\n\
     .xlsx\n\
     .pptx",
-    usage="lazy_geffe.py <encrypted_file>")
+    usage="python lazy_geffe.py <encrypted_file>")
 parser.add_argument('encrypted_file')
 args = parser.parse_args()
+
+headers = {
+    "pdf": "255044462d312e35",
+    "png": "89504e470d0a1a0a",
+    "vsdx": "504b030414000600",
+    "docx": "504b030414000600",
+    "xlsx": "504b030414000600",
+    "pptx": "504b030414000600"
+    } # these MS Office files happen to share the same signature
 
 def extract_header(filename: str) -> str:
     with open(filename, 'rb') as f:
@@ -93,7 +103,7 @@ def geffe(registers: list, key_1: str, key_2: str, key_3: str, gamma_length=64) 
 
     combined_output = [gamma_1, gamma_2, gamma_3]
     f = []
-    for i in range(gamma_length):
+    for i in range(gamma_length): # f(x1, x2, x3) = (x1 & x2) ^ (!x2 & x3)
         x1 = int(combined_output[0][i])
         x2 = int(combined_output[1][i])
         x3 = int(combined_output[2][i])
@@ -108,7 +118,7 @@ def geffe_analysis(registers: list, gamma: str, key_1: str, key_3: str) -> str:
     registers.insert(1, registers.pop(0)) # put registers in the right order
     x = gen_init_states(3)
     candidates = []
-    for state in x: # f(x1, x2, x3) = (x1 & x2) ^ (!x2 & x3)
+    for state in x: 
         f = geffe(registers, key_1, state, key_3)
         candidates.append(f)
     correl_list = []
@@ -121,14 +131,8 @@ def siegenthaler_autonomous() -> None:
     register_1 = [4, 2, 0]
     register_2 = [3, 1, 0]
     register_3 = [5, 2, 0]
+    global headers
 
-    headers = {
-        "pdf": "255044462d312e35",
-        "vsdx": "504b030414000600",
-        "docx": "504b030414000600",
-        "xlsx": "504b030414000600",
-        "pptx": "504b030414000600"
-        } # these MS Office files happen to share the same signature
     enc_file = args.encrypted_file
     if not os.path.exists(enc_file):
         print(f'File "{enc_file}" not found!')
@@ -156,15 +160,19 @@ def siegenthaler_autonomous() -> None:
                     gamma += '0'
                 gamma = int(gamma, 2)
                 gamma = hex(gamma)[2:]
-                decrypted = xor(data, bytes.fromhex(gamma), "bytes")
+                if len(gamma) % 2:
+                    gamma = '0' + gamma
+                gamma = bytes.fromhex(gamma)
+                decrypted = xor(data, gamma, "bytes")
                 if decrypted.hex()[:16] == headers[f"{filetype}"]:
-                    with open ("g.txt", "w") as g:
+                    gamma = xor(gamma, b'\x00') # convert gamma to binary format
+                    with open (f"gamma_{filename}.txt", "w") as g:
                         g.write(gamma)
                     with open(f"{dec_file}", "wb") as d:
                         d.write(decrypted)
                     print(f"{enc_file} has been successfully decrypted as {dec_file}.")
                     print(f"Key: {key}.")
-                    print(f"Gamma is saved to g.txt")
+                    print(f"Gamma is saved to gamma_{filename}.txt")
                     return None
                 print("Decryption failed")
 
@@ -182,14 +190,8 @@ def siegenthaler_dependent() -> str | None:
         register_1 = [4, 2, 0]
         register_2 = [3, 1, 0]
         register_3 = [5, 2, 0]
+        global headers
 
-        headers = {
-            "pdf": "255044462d312e35",
-            "vsdx": "504b030414000600",
-            "docx": "504b030414000600",
-            "xlsx": "504b030414000600",
-            "pptx": "504b030414000600"
-            }
         enc_file = args.encrypted_file
         if not os.path.exists(enc_file):
             print(f'File "{enc_file}" not found!')
@@ -212,8 +214,8 @@ def siegenthaler_dependent() -> str | None:
                             k.write(key)
                             k.close()
                             pass
-                        subprocess.run(f'./geffe registers.txt key.txt g.txt > /dev/null', shell='/bin/bash')
-                        with open("g.txt", 'r') as g:
+                        subprocess.run(f'./geffe registers.txt key.txt gamma_{filename}.txt > /dev/null', shell='/bin/bash')
+                        with open(f"gamma_{filename}.txt", 'r') as g:
                             gamma = g.read()
                         with open(f"{enc_file}", 'rb') as e:
                             data = e.read()
@@ -221,13 +223,16 @@ def siegenthaler_dependent() -> str | None:
                             gamma += '0'
                         gamma = int(gamma, 2)
                         gamma = hex(gamma)[2:]
-                        decrypted = xor(data, bytes.fromhex(gamma), "bytes")
+                        if len(gamma) % 2:
+                            gamma = '0' + gamma
+                        gamma = bytes.fromhex(gamma)
+                        decrypted = xor(data, gamma, "bytes")
                         if decrypted.hex()[:16] == headers[f"{filetype}"]:
                             with open(f"{dec_file}", "wb") as d:
                                 d.write(decrypted)
                             print(f"{enc_file} has been successfully decrypted as {dec_file}")
                             print(f"Key: {key}")
-                            print(f"Gamma is saved to g.txt")
+                            print(f"Gamma is saved to gamma_{filename}.txt")
                             return None
                         else:
                             continue
