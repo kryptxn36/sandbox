@@ -61,7 +61,7 @@ def lfsr(degrees: list, state: str, rounds=64) -> str:
     degrees.sort()
     degrees.reverse()
     gamma = ''
-    for i in range(rounds):
+    for _ in range(rounds):
         gamma += state[-1]
         state = str(int(state[degrees[1]]) ^ int(state[-1])) + state[:-1]
     return gamma
